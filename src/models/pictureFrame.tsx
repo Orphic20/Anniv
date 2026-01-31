@@ -31,7 +31,6 @@ export function PictureFrame({
 }: PictureFrameProps) {
   const { gl } = useThree();
 
-  // FIXED: Only one 'gltf' declaration now
   const modelPath = `${import.meta.env.BASE_URL}picture_frame.glb`;
   const gltf = useLoader(GLTFLoader, modelPath);
   
