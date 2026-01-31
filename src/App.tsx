@@ -364,14 +364,20 @@ export default function App() {
             activeCardId={activeCardId}
             onToggleCard={setActiveCardId}
           />
-          <ambientLight intensity={(1 - environmentProgress) * 0.8} />
-          <directionalLight intensity={0.5} position={[2, 10, 0]} />
+          
+          {/* === LIGHTING UPGRADE === */}
+          {/* Increased intensity so scene is much lighter */}
+          <ambientLight intensity={(1 - environmentProgress) * 2.5} />
+          <directionalLight intensity={2.0} position={[2, 10, 0]} />
+          
+          {/* Boosted environment intensity so the background light is visible */}
           <Environment
-            files={[withBase("/baguio.hdr")]} // FIXED PATH
+            files={[withBase("/baguio.hdr")]}
             background
-            environmentIntensity={0.1 * environmentProgress}
-            backgroundIntensity={0.05 * environmentProgress}
+            environmentIntensity={1.5 * environmentProgress}
+            backgroundIntensity={0.5 * environmentProgress}
           />
+          
           <Fireworks isActive={fireworksActive} origin={[0, 10, 0]} />
           <ConfiguredOrbitControls />
         </Suspense>
@@ -379,4 +385,3 @@ export default function App() {
     </div>
   );
 }
-
