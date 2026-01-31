@@ -30,7 +30,12 @@ export function PictureFrame({
   ...groupProps
 }: PictureFrameProps) {
   const { gl } = useThree();
-  const gltf = useLoader(GLTFLoader, "/picture_frame.glb");
+
+  // FIXED: Added base URL for the 3D model path
+  const modelPath = `${import.meta.env.BASE_URL}picture_frame.glb`;
+  const gltf = useLoader(GLTFLoader, modelPath);
+  
+  // The 'image' prop comes from App.tsx, where we already added withBase()
   const pictureTexture = useTexture(image);
 
   pictureTexture.colorSpace = SRGBColorSpace;
@@ -81,26 +86,3 @@ export function PictureFrame({
         map: pictureTexture,
         roughness: 0.08,
         metalness: 0,
-        side: DoubleSide,
-      }),
-    [pictureTexture]
-  );
-
-  useEffect(() => {
-    return () => {
-      pictureMaterial.dispose();
-    };
-  }, [pictureMaterial]);
-
-  return (
-    <group {...groupProps}>
-      <group rotation={[0.04, 0, 0]}>
-      <primitive object={frameScene} />
-      <mesh position={imagePosition} rotation={[0.435, Math.PI, 0]} material={pictureMaterial}>
-        <planeGeometry args={[imageWidth, imageHeight]} />
-      </mesh>
-      {children}
-      </group>
-    </group>
-  );
-}
