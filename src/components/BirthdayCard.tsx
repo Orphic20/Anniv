@@ -111,4 +111,81 @@ export function BirthdayCard({
       if (isHovered) {
         positionTarget.y += HOVER_LIFT;
       }
-      rotationTarget.copy(defaultQuaternion
+      rotationTarget.copy(defaultQuaternion);
+    }
+
+    const lerpAlpha = 1 - Math.exp(-delta * 12);
+    const slerpAlpha = 1 - Math.exp(-delta * 10);
+
+    group.position.lerp(positionTarget, lerpAlpha);
+    group.quaternion.slerp(rotationTarget, slerpAlpha);
+  });
+
+  const handlePointerOver = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
+      if (!isActive) {
+        setIsHovered(true);
+      }
+    },
+    [isActive]
+  );
+
+  const handlePointerOut = useCallback((event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation();
+    setIsHovered(false);
+  }, []);
+
+  const handlePointerDown = useCallback((event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation();
+  }, []);
+
+  const handleClick = useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation();
+      onToggle(id);
+    },
+    [id, onToggle]
+  );
+
+  return (
+    <group ref={groupRef}>
+      <group rotation={[0, 0, 0]}>
+        <mesh
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
+          onPointerDown={handlePointerDown}
+          onClick={handleClick}
+          castShadow
+          receiveShadow
+        >
+          <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
+          {/* UPDATED MATERIAL: Adds self-illuminating glow */}
+          <meshStandardMaterial
+            map={texture}
+            emissive="white"
+            emissiveMap={texture}
+            emissiveIntensity={0.6}
+            roughness={0.35}
+            metalness={0.05}
+            toneMapped={false}
+          />
+        </mesh>
+        <mesh position={[0, 0, -0.001]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[CARD_WIDTH, CARD_HEIGHT]} />
+          <meshStandardMaterial color="#f7f2ff" />
+        </mesh>
+        <mesh position={[0, 0, -0.0008]}>
+          <planeGeometry args={[CARD_WIDTH * 0.98, CARD_HEIGHT * 0.98]} />
+          <meshStandardMaterial
+            color="#ffffff"
+            side={DoubleSide}
+            roughness={1}
+            metalness={0}
+          />
+        </mesh>
+        {children}
+      </group>
+    </group>
+  );
+}
