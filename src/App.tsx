@@ -77,7 +77,7 @@ const BACKGROUND_FADE_DURATION = 1;
 const BACKGROUND_FADE_START = 2;
 
 const TYPED_LINES = [
-  "> Loewin and Julianne",
+  "> Julianne",
   "...",
   "> today is our anniversary",
   "...",
@@ -379,3 +379,4 @@ export default function App() {
     </div>
   );
 }
+
