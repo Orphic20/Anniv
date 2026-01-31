@@ -31,6 +31,7 @@ export function PictureFrame({
 }: PictureFrameProps) {
   const { gl } = useThree();
 
+  // FIXED: Using BASE_URL for GitHub Pages and ensured only one 'gltf' declaration
   const modelPath = `${import.meta.env.BASE_URL}picture_frame.glb`;
   const gltf = useLoader(GLTFLoader, modelPath);
   
