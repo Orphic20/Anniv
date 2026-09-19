@@ -7,9 +7,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { Group } from "three";
-import { Vector3 } from "three";
+import { TOUCH, Vector3 } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Candle } from "./models/candle";
 import { Cake } from "./models/cake";
@@ -40,6 +41,8 @@ type AnimatedSceneProps = {
   onBackgroundFadeChange?: (opacity: number) => void;
   onEnvironmentProgressChange?: (progress: number) => void;
   candleLit: boolean;
+  canBlowCandle?: boolean;
+  onBlowCandle?: () => void;
   onAnimationComplete?: () => void;
   cards: ReadonlyArray<BirthdayCardConfig>;
   activeCardId: string | null;
@@ -110,6 +113,8 @@ function AnimatedScene({
   onBackgroundFadeChange,
   onEnvironmentProgressChange,
   candleLit,
+  canBlowCandle = false,
+  onBlowCandle,
   onAnimationComplete,
   cards,
   activeCardId,
@@ -246,6 +251,19 @@ function AnimatedScene({
       </group>
       <group ref={candleGroup}>
         <Candle isLit={candleLit} scale={0.25} position={[0, 1.1, 0]} />
+        {canBlowCandle && (
+          <mesh
+            position={[0, 1.4, 0]}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onBlowCandle?.();
+            }}
+          >
+            <sphereGeometry args={[0.5, 16, 16]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        )}
       </group>
     </>
   );
@@ -269,7 +287,21 @@ function ConfiguredOrbitControls() {
     }
   }, [camera]);
 
-  return <OrbitControls ref={controlsRef} enableDamping dampingFactor={0.05} minDistance={ORBIT_MIN_DISTANCE} maxDistance={ORBIT_MAX_DISTANCE} minPolarAngle={ORBIT_MIN_POLAR} maxPolarAngle={ORBIT_MAX_POLAR} />;
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enableDamping
+      enablePan={false}
+      dampingFactor={0.05}
+      minDistance={ORBIT_MIN_DISTANCE}
+      maxDistance={ORBIT_MAX_DISTANCE}
+      minPolarAngle={ORBIT_MIN_POLAR}
+      maxPolarAngle={ORBIT_MAX_POLAR}
+      rotateSpeed={0.85}
+      zoomSpeed={0.8}
+      touches={{ ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN }}
+    />
+  );
 }
 
 export default function App() {
@@ -284,6 +316,9 @@ export default function App() {
   const [isCandleLit, setIsCandleLit] = useState(true);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isTouch, setIsTouch] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches
+  );
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -295,6 +330,30 @@ export default function App() {
 
   const playBackgroundMusic = useCallback(() => {
     backgroundAudioRef.current?.play().catch(() => {});
+  }, []);
+
+  const startExperience = useCallback(() => {
+    if (hasStarted) return;
+    playBackgroundMusic();
+    setHasStarted(true);
+  }, [hasStarted, playBackgroundMusic]);
+
+  const blowOutCandle = useCallback(() => {
+    if (!hasAnimationCompleted || !isCandleLit) return;
+    setIsCandleLit(false);
+    setFireworksActive(true);
+  }, [hasAnimationCompleted, isCandleLit]);
+
+  const handleToggleCard = useCallback((id: string) => {
+    setActiveCardId((current) => (current === id ? null : id));
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsTouch(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
   }, []);
 
   const typingComplete = currentLineIndex >= TYPED_LINES.length;
@@ -330,39 +389,83 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-      if (!hasStarted) { playBackgroundMusic(); setHasStarted(true); }
-      else if (hasAnimationCompleted && isCandleLit) { setIsCandleLit(false); setFireworksActive(true); }
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.code !== "Space" && e.code !== "Enter") return;
+      e.preventDefault();
+      if (!hasStarted) {
+        startExperience();
+      } else {
+        blowOutCandle();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [hasStarted, hasAnimationCompleted, isCandleLit, playBackgroundMusic]);
+  }, [hasStarted, startExperience, blowOutCandle]);
 
   return (
-    <div className="App">
-      <div className="background-overlay" style={{ opacity: backgroundOpacity }}>
-        <div className="typed-text">
-          {typedLines.map((line, i) => (
-            <span className="typed-line" key={i}>
-              {line || "\u00a0"}
-              {cursorVisible && i === (typingComplete ? typedLines.length - 1 : currentLineIndex) && !sceneStarted && <span className="typed-cursor">_</span>}
+    <div className="App" onContextMenu={(event) => event.preventDefault()}>
+      <div
+        className={`background-overlay${hasStarted ? "" : " is-start"}`}
+        style={{ opacity: backgroundOpacity }}
+        {...(!hasStarted
+          ? {
+              role: "button" as const,
+              tabIndex: 0,
+              "aria-label": "Start anniversary",
+              onPointerDown: startExperience,
+              onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => {
+                if (event.code === "Space" || event.code === "Enter") {
+                  event.preventDefault();
+                  startExperience();
+                }
+              },
+            }
+          : {})}
+      >
+        {hasStarted ? (
+          <div className="typed-text">
+            {typedLines.map((line, i) => (
+              <span className="typed-line" key={i}>
+                {line || "\u00a0"}
+                {cursorVisible && i === (typingComplete ? typedLines.length - 1 : currentLineIndex) && !sceneStarted && <span className="typed-cursor">_</span>}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="start-prompt">
+            <span className="start-prompt-label">
+              {isTouch ? "tap to start" : "click or tap to start"}
             </span>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
-      {hasAnimationCompleted && isCandleLit && <div className="hint-overlay">press space to blow out the candle</div>}
-      <Canvas gl={{ alpha: true }} onCreated={({ gl }) => gl.setClearColor("#000000", 0)}>
+      {hasAnimationCompleted && isCandleLit && (
+        <button
+          type="button"
+          className="hint-overlay hint-button"
+          onClick={blowOutCandle}
+        >
+          {isTouch ? "tap to blow out the candle" : "tap the candle or press space"}
+        </button>
+      )}
+      <Canvas
+        gl={{ alpha: true }}
+        dpr={[1, 1.75]}
+        style={{ touchAction: "none" }}
+        onCreated={({ gl }) => gl.setClearColor("#000000", 0)}
+      >
         <Suspense fallback={null}>
           <AnimatedScene
             isPlaying={hasStarted && sceneStarted}
             candleLit={isCandleLit}
+            canBlowCandle={hasAnimationCompleted && isCandleLit}
+            onBlowCandle={blowOutCandle}
             onBackgroundFadeChange={setBackgroundOpacity}
             onEnvironmentProgressChange={setEnvironmentProgress}
             onAnimationComplete={() => setHasAnimationCompleted(true)}
             cards={BIRTHDAY_CARDS}
             activeCardId={activeCardId}
-            onToggleCard={setActiveCardId}
+            onToggleCard={handleToggleCard}
           />
           
           {/* === LIGHTING UPGRADE === */}
