@@ -106,6 +106,24 @@ canvas {
   width: min(90vw, 28rem);
 }
 
+.music-unlock {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  z-index: 4;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 0.95rem;
+  background: rgba(11, 2, 18, 0.45);
+  color: rgba(255, 242, 228, 0.95);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .hint-button {
   pointer-events: auto;
   appearance: none;

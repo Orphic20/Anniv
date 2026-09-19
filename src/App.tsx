@@ -316,26 +316,59 @@ export default function App() {
   const [isCandleLit, setIsCandleLit] = useState(true);
   const [fireworksActive, setFireworksActive] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [musicBlocked, setMusicBlocked] = useState(false);
   const [isTouch, setIsTouch] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches
   );
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const musicPlayingRef = useRef(false);
 
-  useEffect(() => {
-    const audio = new Audio(withBase("/music.mp3")); // FIXED PATH
-    audio.loop = true;
-    backgroundAudioRef.current = audio;
-    return () => audio.pause();
-  }, []);
+  const playBackgroundMusic = useCallback(async () => {
+    const audio = backgroundAudioRef.current;
+    if (!audio || musicPlayingRef.current) return true;
 
-  const playBackgroundMusic = useCallback(() => {
-    backgroundAudioRef.current?.play().catch(() => {});
+    try {
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new AudioContextClass();
+        }
+        if (audioContextRef.current.state === "suspended") {
+          await audioContextRef.current.resume();
+        }
+      }
+    } catch {
+      // AudioContext is only used to unlock mobile playback.
+    }
+
+    audio.muted = false;
+    audio.volume = 1;
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
+
+    try {
+      if (audio.readyState < 2) {
+        audio.load();
+      }
+      await audio.play();
+      musicPlayingRef.current = true;
+      setMusicBlocked(false);
+      return true;
+    } catch {
+      musicPlayingRef.current = false;
+      setMusicBlocked(true);
+      return false;
+    }
   }, []);
 
   const startExperience = useCallback(() => {
-    if (hasStarted) return;
-    playBackgroundMusic();
-    setHasStarted(true);
+    void playBackgroundMusic();
+    if (!hasStarted) {
+      setHasStarted(true);
+    }
   }, [hasStarted, playBackgroundMusic]);
 
   const blowOutCandle = useCallback(() => {
@@ -389,6 +422,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasStarted || musicPlayingRef.current) return;
+
+    const retry = () => {
+      if (musicPlayingRef.current) return;
+      void playBackgroundMusic();
+    };
+
+    window.addEventListener("pointerup", retry);
+    window.addEventListener("touchend", retry, { passive: true });
+    window.addEventListener("click", retry);
+    return () => {
+      window.removeEventListener("pointerup", retry);
+      window.removeEventListener("touchend", retry);
+      window.removeEventListener("click", retry);
+    };
+  }, [hasStarted, playBackgroundMusic, musicBlocked]);
+
+  useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.code !== "Space" && e.code !== "Enter") return;
       e.preventDefault();
@@ -412,7 +463,9 @@ export default function App() {
               role: "button" as const,
               tabIndex: 0,
               "aria-label": "Start anniversary",
-              onPointerDown: startExperience,
+              onPointerUp: startExperience,
+              onTouchEnd: startExperience,
+              onClick: startExperience,
               onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => {
                 if (event.code === "Space" || event.code === "Enter") {
                   event.preventDefault();
@@ -439,6 +492,16 @@ export default function App() {
           </div>
         )}
       </div>
+      {hasStarted && musicBlocked && (
+        <button
+          type="button"
+          className="music-unlock"
+          onPointerUp={playBackgroundMusic}
+          onClick={playBackgroundMusic}
+        >
+          tap to enable sound
+        </button>
+      )}
       {hasAnimationCompleted && isCandleLit && (
         <button
           type="button"
@@ -448,6 +511,22 @@ export default function App() {
           {isTouch ? "tap to blow out the candle" : "tap the candle or press space"}
         </button>
       )}
+      <audio
+        ref={backgroundAudioRef}
+        src={withBase("/music.mp3")}
+        loop
+        preload="auto"
+        playsInline
+        onPlaying={() => {
+          musicPlayingRef.current = true;
+          setMusicBlocked(false);
+        }}
+        onPause={() => {
+          if (backgroundAudioRef.current && !backgroundAudioRef.current.ended) {
+            musicPlayingRef.current = false;
+          }
+        }}
+      />
       <Canvas
         gl={{ alpha: true }}
         dpr={[1, 1.75]}
